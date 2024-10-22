@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 // Route class
 class Route {
@@ -18,16 +19,30 @@ class Route {
         turns.add(turn);
     }
 
+    // Getter for streets
+    public List<String> getStreets() {
+        return streets;
+    }
+
+    // Getter for turns
+    public List<TurnDirection> getTurns() {
+        return turns;
+    }
+
     public int legs() {
         return streets.size();
     }
 
-    public double length() {
-        double length = 0;
+    // Calculate the total length of the route using the streets map from MapPlanner
+    public double length(Map<String, Street> streetMap) {
+        double totalLength = 0;
         for (String streetId : streets) {
-            length += streets.get(Integer.parseInt(streetId)).length();
+            Street street = streetMap.get(streetId);
+            if (street != null) {
+                totalLength += street.length();  // Use the length method from the Street class
+            }
         }
-        return length;
+        return totalLength;
     }
 
     public List<SubRoute> loops() {

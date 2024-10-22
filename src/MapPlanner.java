@@ -14,6 +14,11 @@ public class MapPlanner {
         this.adjacencyList = new HashMap<>();
     }
 
+    // Getter for streets map
+    public Map<String, Street> getStreets() {
+        return streets;
+    }
+
     // Set depot location
     public boolean depotLocation(Location depot) {
         if (depot == null || !streets.containsKey(depot.getStreetId())) {
