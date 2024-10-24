@@ -3,7 +3,7 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) {
         // Create a new MapPlanner object with a degree threshold for turns (e.g., 45 degrees)
-        MapPlanner planner = new MapPlanner(46);
+        MapPlanner planner = new MapPlanner(90);
 
         // Add streets to the map
         planner.addStreet("A", new Point(6, 0), new Point(0, 0));
@@ -21,15 +21,19 @@ public class Main {
         planner.addStreet("K", new Point(10, 10), new Point(10, 8));
         planner.addStreet("L", new Point(2, 10), new Point(10, 10));
 
+        planner.printAdjacencyList();
+
         // Set depot location (assume it's on street Y near the middle)
-        Location depot = new Location("G", new Point(6, 6), StreetSide.Right);
+        Location depot = new Location("G", StreetSide.Left);
+        depot.setPoint(new Point(6, 6));
         planner.setDepotLocation(depot);
 
         // Find and print the furthest street from the depot
         String furthestStreet = planner.furthestStreet();
         System.out.println("Furthest Street from Depot: " + furthestStreet);
 
-        Location destination = new Location("D", new Point(2, 4), StreetSide.Right);
+        Location destination = new Location("D", StreetSide.Left);
+        depot.setPoint(new Point(2, 4));
 
         // Set a destination location (assume it's on street j near the midpoint)
 //        Location destination = new Location("J", new Point(8, 8), StreetSide.Right);

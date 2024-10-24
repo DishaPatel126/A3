@@ -1,24 +1,21 @@
 import java.util.*;
 
 public class MapPlanner {
-    private int degrees;
+    private int turnThreshold;
     private Location depot;
     private Map<String, Street> streets;
-    private Map<String, Set<String>> adjacencyList;
+    private Map<String, Map<String, TurnDirection>> adjacencyList;
 
-    // Constructor
-    public MapPlanner(int degrees) {
-        this.degrees = degrees;
+    public MapPlanner(int turnThreshold) {
+        this.turnThreshold = turnThreshold;
         this.streets = new HashMap<>();
         this.adjacencyList = new HashMap<>();
     }
 
-    // Getter for streets map
     public Map<String, Street> getStreets() {
         return streets;
     }
 
-    // Set depot location
     public boolean setDepotLocation(Location depot) {
         if (depot == null || !streets.containsKey(depot.getStreetId())) {
             throw new IllegalArgumentException("Invalid depot location.");
@@ -27,26 +24,43 @@ public class MapPlanner {
         return true;
     }
 
-    // Add street to the map
     public boolean addStreet(String streetId, Point start, Point end) {
         if (streets.containsKey(streetId)) {
-            return false; // Street already exists
+            return false;  // Street already exists
         }
         Street street = new Street(streetId, start, end);
         streets.put(streetId, street);
 
-        // Add street connections in adjacency list
-        adjacencyList.putIfAbsent(streetId, new HashSet<>());
+        // Initialize adjacency list entry for the new street
+        adjacencyList.putIfAbsent(streetId, new HashMap<>());
+
+        // Check for intersections with existing streets
         for (String id : streets.keySet()) {
-            if (!id.equals(streetId) && streets.get(id).intersects(street)) {
-                adjacencyList.get(streetId).add(id);
-                adjacencyList.get(id).add(streetId);
+            if (!id.equals(streetId)) {
+                Street otherStreet = streets.get(id);
+
+                // Intersect if either start or end of one street matches the start or end of the other
+                if (street.intersects(otherStreet)) {
+                    TurnDirection turnDirection = street.calculateTurnDirection(otherStreet, turnThreshold);
+                    adjacencyList.get(streetId).put(id, turnDirection);
+                    adjacencyList.get(id).put(streetId, otherStreet.calculateTurnDirection(street, turnThreshold));
+                }
             }
         }
         return true;
     }
 
-    // Find the furthest street from the depot
+    public void printAdjacencyList() {
+        System.out.println("Adjacency List:");
+        for (String street : adjacencyList.keySet()) {
+            System.out.print(street + " -> ");
+            for (Map.Entry<String, TurnDirection> entry : adjacencyList.get(street).entrySet()) {
+                System.out.print("[" + entry.getKey() + ": " + entry.getValue() + "] ");
+            }
+            System.out.println();
+        }
+    }
+
     public String furthestStreet() {
         if (depot == null) {
             throw new IllegalStateException("Depot location not set.");
@@ -57,7 +71,6 @@ public class MapPlanner {
 
         for (Street street : streets.values()) {
             double distance = distanceFromDepot(street.getMidPoint());
-//            System.out.println("Street: " + street.getId() + ", Distance: " + distance);
 
             if (distance > maxDistance) {
                 maxDistance = distance;
@@ -67,72 +80,78 @@ public class MapPlanner {
         return furthestStreetId;
     }
 
-    // Get streets adjacent to the current street
     public List<String> getNextStreets(String currentStreetId) {
-//        System.out.println("Adjacency List: " + adjacencyList);
-
-        return new ArrayList<>(adjacencyList.getOrDefault(currentStreetId, new HashSet<>()));
+        return new ArrayList<>(adjacencyList.getOrDefault(currentStreetId, new HashMap<>()).keySet());
     }
 
-    // Calculate route with no left turn constraint
     public Route routeNoLeftTurn(Location destination) throws Exception {
-        // Starting point is the depot
-        Location currentLocation = depot;
-        String currentStreetId = currentLocation.getStreetId();
+        PriorityQueue<RouteNode> queue = new PriorityQueue<>(Comparator.comparingDouble(RouteNode::getDistance));
+        Map<String, Double> distanceMap = new HashMap<>();
+        Map<String, Route> routeMap = new HashMap<>();
 
-        // Create a new route starting from the depot
-        Route route = new Route();
+        String depotStreetId = depot.getStreetId();
+        Street depotStreet = streets.get(depotStreetId);
 
-        while (!currentStreetId.equals(destination.getStreetId())) {
-            // Get the next street options (adjacent streets)
-            List<String> nextStreets = getNextStreets(currentStreetId);
-//            System.out.println("Current Street: " + currentStreetId + ", Next Streets: " + nextStreets);
+        queue.add(new RouteNode(depotStreet, new Route(), 0));
+        distanceMap.put(depotStreetId, 0.0);
 
-            boolean rightTurnFound = false;
+        while (!queue.isEmpty()) {
+            RouteNode current = queue.poll();
+            Street currentStreet = current.getStreet();
+            Route currentRoute = current.getRoute();
+            double currentDistance = current.getDistance();
 
-            // Check the turn direction for each next street
-            for (String nextStreetId : nextStreets) {
-                Street currentStreet = streets.get(currentStreetId);
-                Street nextStreet = streets.get(nextStreetId);
-                TurnDirection turnDirection = currentStreet.calculateTurnDirection(nextStreet, degrees);
-//                System.out.println("Current Street: " + currentStreetId + ", Next Street: " + nextStreetId + ", Turn: " + turnDirection);
-
-                // Prioritize Right Turns, then Straight paths
-                if (turnDirection == TurnDirection.Right) {
-                    route = new Route(route, nextStreetId, turnDirection);  // Add to the route
-                    currentStreetId = nextStreetId;  // Move to the next street
-                    rightTurnFound = true;
-                    break;
-                }
+            if (currentStreet.getId().equals(destination.getStreetId())) {
+                return currentRoute;  // Return the final route once we reach the destination
             }
 
-            // If no right turn is found, allow straight paths
-            if (!rightTurnFound) {
-                for (String nextStreetId : nextStreets) {
-                    Street currentStreet = streets.get(currentStreetId);
-                    Street nextStreet = streets.get(nextStreetId);
-                    TurnDirection turnDirection = currentStreet.calculateTurnDirection(nextStreet, degrees);
+            for (String neighbor : getNextStreets(currentStreet.getId())) {
+                Street neighborStreet = streets.get(neighbor);
+                TurnDirection turn = currentStreet.calculateTurnDirection(neighborStreet, turnThreshold);
 
-                    if (turnDirection == TurnDirection.Straight) {
-                        route = new Route(route, nextStreetId, turnDirection);
-                        currentStreetId = nextStreetId;
-                        rightTurnFound = true;
-                        break;
+                if (turn == TurnDirection.Right || turn == TurnDirection.Straight) {
+                    double newDist = currentDistance + neighborStreet.length();
+
+                    if (newDist < distanceMap.getOrDefault(neighbor, Double.POSITIVE_INFINITY)) {
+                        distanceMap.put(neighbor, newDist);
+                        // Extend the route by adding the next street and the turn direction
+                        Route newRoute = new Route(currentRoute, neighbor, turn);
+                        routeMap.put(neighbor, newRoute);
+                        queue.add(new RouteNode(neighborStreet, newRoute, newDist));
                     }
                 }
             }
-
-            // If no valid right turn or straight path is found, throw an exception
-            if (!rightTurnFound) {
-                throw new Exception("No valid right turn or straight route available");
-            }
         }
 
-        return route;
+        throw new Exception("No valid route found.");
     }
 
-    // Helper methods
     private double distanceFromDepot(Point point) {
         return Math.sqrt(Math.pow(point.getX() - depot.getPoint().getX(), 2) + Math.pow(point.getY() - depot.getPoint().getY(), 2));
+    }
+
+    // Helper class for Dijkstra's algorithm
+    private static class RouteNode {
+        private Street street;
+        private Route route;
+        private double distance;
+
+        public RouteNode(Street street, Route route, double distance) {
+            this.street = street;
+            this.route = route;
+            this.distance = distance;
+        }
+
+        public Street getStreet() {
+            return street;
+        }
+
+        public Route getRoute() {
+            return route;
+        }
+
+        public double getDistance() {
+            return distance;
+        }
     }
 }

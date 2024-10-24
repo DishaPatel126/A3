@@ -1,43 +1,36 @@
-// SubRoute class
-class SubRoute {
-    // Subset of streets and turns in a larger route
-    public Route extractRoute() {
-        // Extract a subroute from this route
-        return null; // Placeholder
-    }
-}
-
-// Enum for TurnDirection
-enum TurnDirection {
-    Right, Left, Straight, UTurn;
-}
-
-// Enum for StreetSide
-enum StreetSide {
-    Left, Right;
-}
-
-// Helper class for Dijkstra's algorithm
-class RouteNode {
+public class SubRoute {
     private String streetId;
-    private double distance;
-    private Route route;
+    private TurnDirection turnDirection;
+    private double length;
 
-    public RouteNode(String streetId, double distance, Route route) {
+    public SubRoute(String streetId, TurnDirection turnDirection, double length) {
         this.streetId = streetId;
-        this.distance = distance;
-        this.route = route;
+        this.turnDirection = turnDirection;
+        this.length = length;
+    }
+
+    public double length() {
+        return length;
     }
 
     public String getStreetId() {
         return streetId;
     }
 
-    public double getDistance() {
-        return distance;
+    public TurnDirection getTurnDirection() {
+        return turnDirection;
     }
 
-    public Route getRoute() {
-        return route;
+    public Route extractRoute() {
+        return null;
+    }
+
+    public boolean isLoop() {
+        // Placeholder logic for loops
+        return false;
+    }
+
+    public boolean isKeyTurn() {
+        return turnDirection != TurnDirection.Straight;
     }
 }
